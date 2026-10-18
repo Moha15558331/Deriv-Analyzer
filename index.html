@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deriv Analyzer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+
+html{overflow-x:hidden}
+body{min-height:100vh;background:#0a0e17;color:#e8edf5;font-family:system-ui,-apple-system,sans-serif;padding:10px;overflow-x:hidden;-webkit-text-size-adjust:100%}
+.container{max-width:980px;margin:0 auto;width:100%;min-width:0}
+.header{background:#121826;border:1px solid #1e2a3d;border-radius:16px;padding:14px;margin-bottom:12px;overflow:visible}
+.header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;flex:1;position:relative}
+.logo{font-weight:700;font-size:17px;color:#fff}
+.logo span{color:#ff3b5c}
+.status{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;flex-shrink:0}
+.dot{width:9px;height:9px;border-radius:50%;background:#ff5c6c;flex-shrink:0}
+.dot.on{background:#2ee59d;box-shadow:0 0 8px #2ee59d}
+
+/* custom market picker */
+.market-pick{position:relative;display:block;max-width:100%;z-index:30}
+.market-native{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;overflow:hidden}
+.mp-trigger{display:inline-flex;align-items:center;gap:8px;max-width:100%;padding:4px 2px;border:0;background:transparent;color:#e8edf5;font-size:14px;font-weight:650;cursor:pointer;text-align:left;font-family:inherit}
+.mp-trigger:hover{color:#fff}
+.mp-trigger span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:min(280px,70vw)}
+.mp-caret{color:#c5d0e0;font-size:14px;line-height:1;transition:transform .15s}
+.market-pick.open .mp-caret{transform:rotate(180deg)}
+.mp-menu{position:absolute;top:calc(100% + 6px);left:0;min-width:min(320px,92vw);max-width:min(360px,94vw);max-height:min(360px,55vh);overflow-y:auto;background:#0f1520;border:1px solid #2a3a50;border-radius:12px;padding:6px;box-shadow:0 12px 40px rgba(0,0,0,.55);z-index:40;scrollbar-width:thin;scrollbar-color:#2a3a50 transparent}
+.mp-menu[hidden]{display:none}
+.mp-group{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#6b7c93;padding:10px 10px 4px}
+.mp-item{display:block;width:100%;text-align:left;border:0;background:transparent;color:#c5d0e0;font-size:13px;font-weight:550;padding:9px 10px;border-radius:8px;cursor:pointer;font-family:inherit}
+.mp-item:hover{background:#1a2435;color:#fff}
+.mp-item.active{background:#12261f;color:#2ee59d;font-weight:700}
+
+.price-row{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.price-line{display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap}
+.spark{width:80px;height:34px;display:block;flex-shrink:0}
+.price{font-size:clamp(26px,8vw,42px);font-weight:700;font-variant-numeric:tabular-nums;color:#e8edf5;line-height:1.1;word-break:break-all}
+.price.up{color:#2ee59d}
+.price.down{color:#ff5c6c}
+.last-digit{display:inline-block;font-size:clamp(22px,6vw,32px);font-weight:700;color:#fff;background:#1a2435;border-radius:8px;line-height:1;padding:6px 10px;min-width:24px;text-align:center;flex-shrink:0}
+.last-digit.up{background:#12b886;color:#fff}
+.last-digit.down{background:#e23b4a;color:#fff}
+.change{font-size:14px;font-weight:600;margin-top:4px}
+.change.up{color:#2ee59d}.change.down{color:#ff5c6c}
+.change-label{font-size:11px;color:#7a8ba3;margin-bottom:2px}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:#1e2a3d;margin-top:14px;border-radius:10px;overflow:hidden}
+.stat{background:#121826;padding:10px 6px;text-align:center;min-width:0}
+.stat-label{font-size:9px;color:#6b7c93;text-transform:uppercase;letter-spacing:.4px}
+.stat-value{font-size:13px;font-weight:600;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.control{background:#121826;border:1px solid #1e2a3d;border-radius:12px;padding:12px;min-width:0}
+.control label{display:block;font-size:11px;color:#7a8ba3;margin-bottom:6px;letter-spacing:.4px;text-transform:uppercase}
+.control input,.control select{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #2a3a50;background:#0c111b;color:#e8edf5;font-size:15px;font-weight:600}
+.control input:focus,.control select:focus{outline:none;border-color:#3d5a80}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.card{background:#121826;border:1px solid #1e2a3d;border-radius:14px;padding:14px;min-width:0;overflow:hidden}
+.card.full{grid-column:1/-1}
+.card-title{font-size:13px;font-weight:700;letter-spacing:.3px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.badge{font-size:10px;font-weight:600;color:#7a8ba3;background:#0c111b;border:1px solid #1e2a3d;border-radius:20px;padding:3px 8px;white-space:nowrap}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;min-width:0}
+.bar-label{width:52px;font-size:12px;font-weight:600;flex-shrink:0;color:#c5d0e0}
+.bar-track{flex:1;height:14px;background:#1a2435;border-radius:5px;overflow:hidden;min-width:0}
+.bar-fill{height:100%;border-radius:5px;transition:width .25s}
+.bar-fill.even,.bar-fill.over,.bar-fill.rise{background:linear-gradient(90deg,#1fbf80,#2ee59d)}
+.bar-fill.odd,.bar-fill.under,.bar-fill.fall{background:linear-gradient(90deg,#e04555,#ff5c6c)}
+.bar-pct{width:72px;text-align:right;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;flex-shrink:0;color:#e8edf5}
+.digit-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;align-items:stretch}
+.digit-cell{background:#0c111b;border:1px solid #1e2a3d;border-radius:10px;padding:8px 4px 6px;text-align:center;min-width:0;display:flex;flex-direction:column;align-items:center}
+.digit-cell.most{border-color:#2ee59d;background:#0f2a22}
+.digit-cell.least{border-color:#ff5c6c;background:#2a1418}
+.digit-pct{font-size:10px;font-weight:700;color:#e8edf5;margin-bottom:4px;line-height:1;font-variant-numeric:tabular-nums}
+.digit-plot{height:48px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
+.digit-bar{width:50%;max-width:14px;background:linear-gradient(180deg,#2ee59d,#1fbf80);border-radius:3px 3px 0 0;min-height:2px;transition:height .25s}
+.digit-cell.least .digit-bar{background:linear-gradient(180deg,#ff5c6c,#e04555)}
+.digit-num{font-size:13px;font-weight:700;margin-top:4px;color:#e8edf5}
+.digit-cell.most .digit-num{color:#2ee59d}
+.digit-cell.least .digit-num{color:#ff5c6c}
+.digit-note{display:none}
+.pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.pill{background:#0c111b;border:1px solid #1e2a3d;border-radius:20px;padding:6px 10px;font-size:11px}
+.pill strong{color:#e8edf5}
+.most strong{color:#2ee59d}
+.least strong{color:#ff5c6c}
+.chart-card{background:#121826;border:1px solid #1e2a3d;border-radius:16px;padding:12px;margin-bottom:12px;overflow:hidden}
+.chart-top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.chart-title{font-size:12px;font-weight:700;letter-spacing:.3px;min-width:0}
+.chart-tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chart-tools select,.chart-tools button{width:auto;padding:6px 8px;font-size:12px;border-radius:8px;border:1px solid #2a3a50;background:#0c111b;color:#e8edf5;cursor:pointer}
+.chart-tools button{min-width:28px;font-weight:700;line-height:1}
+/* dark native selects for chart tools where still used */
+.chart-tools select{color-scheme:dark}
+.chart-wrap{position:relative;height:220px;width:100%;min-width:0}
+.chart-wrap canvas{width:100%;height:100%;display:block;cursor:crosshair;touch-action:none}
+.chart-tip{position:absolute;display:none;pointer-events:none;background:#1c2433;border:1px solid #2a3a50;border-radius:8px;padding:8px 10px;font-size:12px;z-index:2;min-width:120px;max-width:min(200px,80vw)}
+.chart-tip .tip-pct{font-weight:700;margin-bottom:2px}
+.chart-tip .tip-pct.up{color:#2ee59d}
+.chart-tip .tip-pct.down{color:#ff5c6c}
+.chart-tip .tip-px{font-weight:700}
+.chart-tip .tip-tm{color:#7a8ba3;margin-top:2px}
+.range-pop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:20;padding:16px}
+.range-pop.show{display:flex}
+.range-box{background:#121826;border:1px solid #2a3a50;border-radius:14px;padding:22px 22px 16px;width:min(360px,100%);text-align:center}
+.range-box h3{font-size:16px;margin-bottom:8px}
+.range-box p{color:#b7c3d4;font-size:14px;line-height:1.45}
+.range-box button{margin-top:16px;width:auto;padding:8px 18px;border-radius:8px;border:0;background:#2ee59d;color:#06281c;font-weight:700;cursor:pointer}
+@media(max-width:700px){
+  body{padding:8px}
+  .header{padding:12px;border-radius:14px}
+  .header-top{margin-bottom:10px}
+  .price{font-size:clamp(24px,7.5vw,34px)}
+  .spark{width:64px;height:28px}
+  .stats{margin-top:12px}
+  .stat{padding:8px 4px}
+  .stat-label{font-size:8px}
+  .stat-value{font-size:12px}
+  .controls{grid-template-columns:1fr}
+  .grid{grid-template-columns:1fr}
+  .digit-grid{grid-template-columns:repeat(5,1fr);gap:5px}
+  .chart-wrap{height:200px}
+  .chart-tools select{max-width:110px}
+  .bar-label{width:48px;font-size:11px}
+  .bar-pct{width:64px;font-size:11px}
+}
+@media(max-width:400px){
+  .digit-grid{grid-template-columns:repeat(5,1fr);gap:4px}
+  .digit-cell{padding:6px 2px 4px}
+  .digit-pct{font-size:9px}
+  .digit-num{font-size:12px}
+  .last-digit{padding:5px 8px}
+}
+@media(min-width:701px){
+  .digit-grid{grid-template-columns:repeat(10,1fr)}
+}
+
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="header-top">
+      <div class="brand">
+        <div class="logo">Deriv <span>Analyzer</span></div>
+                <div class="market-pick" id="marketPick">
+          <select id="market" class="market-native" aria-hidden="true" tabindex="-1">
+        <optgroup label="Volatility">
+          <option value="R_10">Volatility 10 Index</option>
+          <option value="R_25">Volatility 25 Index</option>
+          <option value="R_50">Volatility 50 Index</option>
+          <option value="R_75">Volatility 75 Index</option>
+          <option value="R_100">Volatility 100 Index</option>
+        </optgroup>
+        <optgroup label="Volatility (1s)">
+          <option value="1HZ10V">Volatility 10 (1s) Index</option>
+          <option value="1HZ15V">Volatility 15 (1s) Index</option>
+          <option value="1HZ25V" selected>Volatility 25 (1s) Index</option>
+          <option value="1HZ30V">Volatility 30 (1s) Index</option>
+          <option value="1HZ50V">Volatility 50 (1s) Index</option>
+          <option value="1HZ75V">Volatility 75 (1s) Index</option>
+          <option value="1HZ90V">Volatility 90 (1s) Index</option>
+          <option value="1HZ100V">Volatility 100 (1s) Index</option>
+        </optgroup>
+        <optgroup label="Boom / Crash">
+          <option value="BOOM1000">Boom 1000 Index</option>
+          <option value="BOOM500">Boom 500 Index</option>
+          <option value="BOOM300">Boom 300 Index</option>
+          <option value="BOOM600">Boom 600 Index</option>
+          <option value="BOOM900">Boom 900 Index</option>
+          <option value="CRASH1000">Crash 1000 Index</option>
+          <option value="CRASH500">Crash 500 Index</option>
+          <option value="CRASH300">Crash 300 Index</option>
+          <option value="CRASH600">Crash 600 Index</option>
+          <option value="CRASH900">Crash 900 Index</option>
+        </optgroup>
+        <optgroup label="Step Index">
+          <option value="stpRNG">Step Index</option>
+          <option value="stpRNG2">Step Index 2</option>
+          <option value="stpRNG3">Step Index 3</option>
+          <option value="stpRNG4">Step Index 4</option>
+          <option value="stpRNG5">Step Index 5</option>
+        </optgroup>
+        <optgroup label="Jump Indices">
+          <option value="JD10">Jump 10 Index</option>
+          <option value="JD25">Jump 25 Index</option>
+          <option value="JD50">Jump 50 Index</option>
+          <option value="JD75">Jump 75 Index</option>
+          <option value="JD100">Jump 100 Index</option>
+        </optgroup>
+        <optgroup label="Drift Switch (Bull/Bear)">
+          <option value="DSI10">Drift Switch 10</option>
+          <option value="DSI20">Drift Switch 20</option>
+          <option value="DSI30">Drift Switch 30</option>
+          <option value="RDBULL">Bull Market Index</option>
+          <option value="RDBEAR">Bear Market Index</option>
+        </optgroup>
+        <optgroup label="Forex & Crypto">
+          <option value="frxEURUSD">EUR/USD</option>
+          <option value="frxGBPUSD">GBP/USD</option>
+          <option value="frxUSDJPY">USD/JPY</option>
+          <option value="cryBTCUSD">BTC/USD</option>
+          <option value="cryETHUSD">ETH/USD</option>
+          <option value="frxXAUUSD">Gold/USD</option>
+        </optgroup>
+          </select>
+          <button type="button" class="mp-trigger" id="mpTrigger" aria-haspopup="listbox" aria-expanded="false">
+            <span id="mpLabel">Volatility 25 (1s) Index</span>
+            <span class="mp-caret">▾</span>
+          </button>
+          <div class="mp-menu" id="mpMenu" role="listbox" hidden>
+          <div class="mp-group">Volatility</div>
+          <button type="button" class="mp-item" data-value="R_10">Volatility 10 Index</button>
+          <button type="button" class="mp-item" data-value="R_25">Volatility 25 Index</button>
+          <button type="button" class="mp-item" data-value="R_50">Volatility 50 Index</button>
+          <button type="button" class="mp-item" data-value="R_75">Volatility 75 Index</button>
+          <button type="button" class="mp-item" data-value="R_100">Volatility 100 Index</button>
+          <div class="mp-group">Volatility (1s)</div>
+          <button type="button" class="mp-item" data-value="1HZ10V">Volatility 10 (1s) Index</button>
+          <button type="button" class="mp-item" data-value="1HZ15V">Volatility 15 (1s) Index</button>
+          <button type="button" class="mp-item active" data-value="1HZ25V">Volatility 25 (1s) Index</button>
+          <button type="button" class="mp-item" data-value="1HZ30V">Volatility 30 (1s) Index</button>
+          <button type="button" class="mp-item" data-value="1HZ50V">Volatility 50 (1s) Index</button>
+          <button type="button" class="mp-item" data-value="1HZ75V">Volatility 75 (1s) Index</button>
+          <button type="button" class="mp-item" data-value="1HZ90V">Volatility 90 (1s) Index</button>
+          <button type="button" class="mp-item" data-value="1HZ100V">Volatility 100 (1s) Index</button>
+          <div class="mp-group">Boom / Crash</div>
+          <button type="button" class="mp-item" data-value="BOOM1000">Boom 1000 Index</button>
+          <button type="button" class="mp-item" data-value="BOOM500">Boom 500 Index</button>
+          <button type="button" class="mp-item" data-value="BOOM300">Boom 300 Index</button>
+          <button type="button" class="mp-item" data-value="BOOM600">Boom 600 Index</button>
+          <button type="button" class="mp-item" data-value="BOOM900">Boom 900 Index</button>
+          <button type="button" class="mp-item" data-value="CRASH1000">Crash 1000 Index</button>
+          <button type="button" class="mp-item" data-value="CRASH500">Crash 500 Index</button>
+          <button type="button" class="mp-item" data-value="CRASH300">Crash 300 Index</button>
+          <button type="button" class="mp-item" data-value="CRASH600">Crash 600 Index</button>
+          <button type="button" class="mp-item" data-value="CRASH900">Crash 900 Index</button>
+          <div class="mp-group">Step Index</div>
+          <button type="button" class="mp-item" data-value="stpRNG">Step Index</button>
+          <button type="button" class="mp-item" data-value="stpRNG2">Step Index 2</button>
+          <button type="button" class="mp-item" data-value="stpRNG3">Step Index 3</button>
+          <button type="button" class="mp-item" data-value="stpRNG4">Step Index 4</button>
+          <button type="button" class="mp-item" data-value="stpRNG5">Step Index 5</button>
+          <div class="mp-group">Jump Indices</div>
+          <button type="button" class="mp-item" data-value="JD10">Jump 10 Index</button>
+          <button type="button" class="mp-item" data-value="JD25">Jump 25 Index</button>
+          <button type="button" class="mp-item" data-value="JD50">Jump 50 Index</button>
+          <button type="button" class="mp-item" data-value="JD75">Jump 75 Index</button>
+          <button type="button" class="mp-item" data-value="JD100">Jump 100 Index</button>
+          <div class="mp-group">Drift Switch (Bull/Bear)</div>
+          <button type="button" class="mp-item" data-value="DSI10">Drift Switch 10</button>
+          <button type="button" class="mp-item" data-value="DSI20">Drift Switch 20</button>
+          <button type="button" class="mp-item" data-value="DSI30">Drift Switch 30</button>
+          <button type="button" class="mp-item" data-value="RDBULL">Bull Market Index</button>
+          <button type="button" class="mp-item" data-value="RDBEAR">Bear Market Index</button>
+          <div class="mp-group">Forex & Crypto</div>
+          <button type="button" class="mp-item" data-value="frxEURUSD">EUR/USD</button>
+          <button type="button" class="mp-item" data-value="frxGBPUSD">GBP/USD</button>
+          <button type="button" class="mp-item" data-value="frxUSDJPY">USD/JPY</button>
+          <button type="button" class="mp-item" data-value="cryBTCUSD">BTC/USD</button>
+          <button type="button" class="mp-item" data-value="cryETHUSD">ETH/USD</button>
+          <button type="button" class="mp-item" data-value="frxXAUUSD">Gold/USD</button>
+          </div>
+        </div>
+      </div>
+      <div class="status">
+        <div class="dot" id="dot"></div>
+        <span id="statusText">Connecting...</span>
+      </div>
+    </div>
+
+    <div class="price-row">
+      <div>
+        <div class="price-line">
+          <div class="price" id="price">—</div>
+          <canvas class="spark" id="spark" width="96" height="38" aria-hidden="true"></canvas>
+        </div>
+        <div class="change-label">24H Change</div>
+        <div class="change" id="change">—</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:#7a8ba3;margin-bottom:4px">LAST DIGIT</div>
+        <div class="last-digit" id="lastDigit">—</div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">24H HIGH</div>
+        <div class="stat-value" id="high">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">24H LOW</div>
+        <div class="stat-value" id="low">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Ticks Processed</div>
+        <div class="stat-value" id="tickCount">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-top">
+      <div class="chart-title" id="chartTitle">Volatility 25 (1s) Index</div>
+      <div class="chart-tools">
+        <select id="chartStyle" aria-label="Chart style">
+          <option value="line">Line</option>
+          <option value="candles">Candles</option>
+        </select>
+        <select id="chartTf" aria-label="Timeframe">
+          <option value="ticks" selected>1 Tick</option>
+          <option value="60">1 Minute</option>
+          <option value="120">2 Minutes</option>
+          <option value="180">3 Minutes</option>
+          <option value="300">5 Minutes</option>
+          <option value="600">10 Minutes</option>
+          <option value="900">15 Minutes</option>
+          <option value="1800">30 Minutes</option>
+          <option value="3600">1 Hour</option>
+          <option value="7200">2 Hours</option>
+          <option value="14400">4 Hours</option>
+          <option value="28800">8 Hours</option>
+          <option value="86400">1 Day</option>
+        </select>
+        <button type="button" id="zoomOut" title="Zoom out">−</button>
+        <button type="button" id="zoomIn" title="Zoom in">+</button>
+        <button type="button" id="zoomReset" title="Reset zoom">Reset</button>
+      </div>
+    </div>
+    <div class="chart-wrap" id="chartWrap">
+      <canvas id="chart"></canvas>
+      <div class="chart-tip" id="chartTip"></div>
+    </div>
+  </div>
+
+
+  <div class="controls">
+    <div class="control">
+      <label>Ticks to Analyze</label>
+      <input type="number" id="ticks" value="100" min="1" max="1000">
+    </div>
+    <div class="control">
+      <label>Digit Over</label>
+      <input type="number" id="over" value="4" min="0" max="9">
+    </div>
+    <div class="control">
+      <label>Digit Under</label>
+      <input type="number" id="under" value="5" min="0" max="9">
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-title">Even / Odd <span class="badge" id="eoBadge">0 ticks</span></div>
+      <div class="bar-row"><div class="bar-label">Even</div><div class="bar-track"><div class="bar-fill even" id="evenBar" style="width:0%"></div></div><div class="bar-pct" id="evenPct">0% (0)</div></div>
+      <div class="bar-row"><div class="bar-label">Odd</div><div class="bar-track"><div class="bar-fill odd" id="oddBar" style="width:0%"></div></div><div class="bar-pct" id="oddPct">0% (0)</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Over / Under <span class="badge" id="ouBadge">0 ticks</span></div>
+      <div class="bar-row"><div class="bar-label" id="overLabel">Over 4</div><div class="bar-track"><div class="bar-fill over" id="overBar" style="width:0%"></div></div><div class="bar-pct" id="overPct">0% (0)</div></div>
+      <div class="bar-row"><div class="bar-label" id="underLabel">Under 5</div><div class="bar-track"><div class="bar-fill under" id="underBar" style="width:0%"></div></div><div class="bar-pct" id="underPct">0% (0)</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Rise / Fall <span class="badge" id="rfBadge">0 ticks</span></div>
+      <div class="bar-row"><div class="bar-label">Rise</div><div class="bar-track"><div class="bar-fill rise" id="riseBar" style="width:0%"></div></div><div class="bar-pct" id="risePct">0% (0)</div></div>
+      <div class="bar-row"><div class="bar-label">Fall</div><div class="bar-track"><div class="bar-fill fall" id="fallBar" style="width:0%"></div></div><div class="bar-pct" id="fallPct">0% (0)</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Match / Differ <span class="badge" id="mdBadge">0 ticks</span></div>
+      <div class="pills">
+        <div class="pill most">Most occurring digit: <strong id="most">—</strong></div>
+        <div class="pill least">Least occurring digit: <strong id="least">—</strong></div>
+      </div>
+    </div>
+
+    <div class="card full">
+      <div class="card-title">Digit Frequency (0-9) <span class="badge" id="digitBadge">0 ticks</span></div>
+      <div class="digit-grid" id="digitGrid"></div>
+      <div class="digit-note" id="digitNote">Last digit stats</div>
+    </div>
+  </div>
+</div>
+<div class="range-pop" id="rangePop">
+  <div class="range-box">
+    <h3 id="rangeTitle">Tick limit</h3>
+    <p id="rangeText">Ticks data ranges should be between 1-1000</p>
+    <button type="button" id="rangeOk">OK</button>
+  </div>
+</div>
+
+<script>
+const APP_ID = "34GGk6VAHQWY2QDMsCKyZ";
+const WS_URL = "wss://api.derivws.com/trading/v1/options/ws/public";
+
+let ws = null;
+let ticks = [];
+let prices = [];
+let totalTicks = 0;
+let sessionHigh = null;
+let sessionLow = null;
+let lastPrice = null;
+let subscriptionId = null;
+let pingInterval = null;
+let pingSentAt = 0;
+let reconnectTimer = null;
+let dayOpen = null;
+let pipSize = 2;
+let chartPoints = [];
+let samplePoints = [];
+let syncTimer = null;
+let chartCandles = [];
+let hoverIndex = -1;
+let viewBars = null;
+let viewRight = null;
+let followLive = true;
+let chartDrag = false;
+let chartDragX = 0;
+const CHART_LIMIT = 1000;
+const STORE_LIMIT = 1001;
+
+const marketEl = document.getElementById("market");
+const ticksEl = document.getElementById("ticks");
+const overEl = document.getElementById("over");
+const underEl = document.getElementById("under");
+const priceEl = document.getElementById("price");
+const changeEl = document.getElementById("change");
+const lastDigitEl = document.getElementById("lastDigit");
+const highEl = document.getElementById("high");
+const lowEl = document.getElementById("low");
+const tickCountEl = document.getElementById("tickCount");
+const statusText = document.getElementById("statusText");
+const dot = document.getElementById("dot");
+const digitGrid = document.getElementById("digitGrid");
+const chartCanvas = document.getElementById("chart");
+const chartTip = document.getElementById("chartTip");
+const chartWrap = document.getElementById("chartWrap");
+const chartStyleEl = document.getElementById("chartStyle");
+const chartTfEl = document.getElementById("chartTf");
+
+// Create digit cells
+for (let i = 0; i <= 9; i++) {
+  const cell = document.createElement("div");
+  cell.className = "digit-cell";
+  cell.id = `cell-${i}`;
+  cell.innerHTML = `
+    <div class="digit-plot">
+      <div class="digit-pct" id="pct-${i}">0%</div>
+      <div class="digit-bar" id="bar-${i}" style="height:2px"></div>
+    </div>
+    <div class="digit-num">${i}</div>`;
+  digitGrid.appendChild(cell);
+}
+
+function lastDigitOf(quote) {
+  const s = Number(quote).toFixed(pipSize);
+  return parseInt(s.charAt(s.length - 1), 10);
+}
+
+function setStatus(text, connected) {
+  statusText.textContent = text;
+  dot.className = connected ? "dot on" : "dot";
+}
+
+function getSampleSize() {
+  let n = parseInt(ticksEl.value, 10);
+  if (isNaN(n)) n = 100;
+  return Math.max(1, Math.min(1000, n));
+}
+
+function showPopup(title, text) {
+  document.getElementById("rangeTitle").textContent = title;
+  document.getElementById("rangeText").textContent = text;
+  document.getElementById("rangePop").classList.add("show");
+}
+
+function showTickRangePopup() {
+  showPopup("Tick limit", "Ticks data ranges should be between 1-1000");
+}
+
+function readDigit(el, fallback) {
+  const n = parseInt(el.value, 10);
+  if (isNaN(n)) return fallback;
+  return Math.max(0, Math.min(9, n));
+}
+
+function applyDigitInput(el, fallback) {
+  const raw = el.value.trim();
+  if (raw === "") return;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0 || n > 9) {
+    el.value = String(fallback);
+    showPopup("Digit limit", "Numbers should be between 0-9");
+  }
+  analyze();
+}
+
+function applyTickInput() {
+  const raw = parseInt(ticksEl.value, 10);
+  if (isNaN(raw) || raw < 1 || raw > 1000) {
+    ticksEl.value = isNaN(raw) ? 100 : (raw > 1000 ? 1000 : 1);
+    showTickRangePopup();
+  }
+  loadHistoryAndSubscribe(marketEl.value);
+}
+
+function startPing() {
+  stopPing();
+  const send = () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      pingSentAt = performance.now();
+      ws.send(JSON.stringify({ ping: 1 }));
+    }
+  };
+  send();
+  pingInterval = setInterval(send, 3000);
+}
+
+function setLatency(ms) {
+  void ms;
+}
+
+function stopPing() {
+  if (pingInterval) {
+    clearInterval(pingInterval);
+    pingInterval = null;
+  }
+}
+
+function connect() {
+  if (ws) {
+    try { ws.close(); } catch(e) {}
+  }
+  clearTimeout(reconnectTimer);
+  stopPing();
+
+  setStatus("Connecting...", false);
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    setStatus("Live", true);
+    startPing();
+    loadHistoryAndSubscribe(marketEl.value);
+  };
+
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.msg_type === "ping" || data.ping === "pong") {
+      if (pingSentAt) setLatency(Math.max(1, Math.round(performance.now() - pingSentAt)));
+      return;
+    }
+    if (data.error) {
+      console.error(data.error);
+      setStatus("Error: " + (data.error.message || "API Error"), false);
+      return;
+    }
+
+    if (data.msg_type === "candles" && data.req_id === 3 && Array.isArray(data.candles)) {
+      chartCandles = data.candles.map(c => ({
+        epoch: Number(c.epoch),
+        open: Number(c.open),
+        high: Number(c.high),
+        low: Number(c.low),
+        close: Number(c.close)
+      }));
+      drawChart();
+      return;
+    }
+
+    if (data.msg_type === "candles" && Array.isArray(data.candles) && data.candles.length && data.req_id === 1) {
+      const nowSec = Math.floor(Date.now() / 1000);
+      const midnight = nowSec - (nowSec % 86400);
+      const day = data.candles.find(c => Number(c.epoch) === midnight)
+        || data.candles[data.candles.length - 1];
+      if (Number(day.epoch) < midnight) return;
+      if (data.pip_size) pipSize = data.pip_size;
+      sessionHigh = Number(day.high);
+      sessionLow = Number(day.low);
+      dayOpen = Number(day.open);
+      highEl.textContent = sessionHigh.toFixed(pipSize);
+      lowEl.textContent = sessionLow.toFixed(pipSize);
+      if (lastPrice != null) updateChange(lastPrice);
+      return;
+    }
+
+    // Digit sample only — do not overwrite 24H high/low
+    if (data.msg_type === "history" && data.history && data.history.prices && (data.req_id === 2 || data.req_id === 4)) {
+      if (data.pip_size) pipSize = data.pip_size;
+      const histPrices = data.history.prices.map(Number);
+      const histTimes = (data.history.times || []).map(Number);
+      const incoming = histPrices.map((q, i) => ({ t: histTimes[i] || 0, q: q }));
+      if (data.req_id === 4) {
+        const incomingLast = incoming.length ? incoming[incoming.length - 1].t : 0;
+        const haveLast = samplePoints.length ? samplePoints[samplePoints.length - 1].t : 0;
+        if (incomingLast >= haveLast) {
+          const newer = samplePoints.filter(p => p.t > incomingLast);
+          samplePoints = incoming.concat(newer);
+          const cap = getSampleSize() >= 1000 ? 1000 : getSampleSize() + 1;
+          if (samplePoints.length > cap) samplePoints = samplePoints.slice(-cap);
+          analyze();
+        }
+        return;
+      }
+      const count = Math.min(histPrices.length, getSampleSize());
+      ticks = [];
+      prices = [];
+      chartPoints = [];
+
+      const chartStart = Math.max(0, histPrices.length - STORE_LIMIT);
+      for (let i = chartStart; i < histPrices.length; i++) {
+        chartPoints.push({ t: histTimes[i] || 0, q: histPrices[i] });
+      }
+      const cap = getSampleSize() >= 1000 ? 1000 : getSampleSize() + 1;
+      samplePoints = chartPoints.slice(-cap);
+
+      for (let i = histPrices.length - count; i < histPrices.length; i++) {
+        const q = histPrices[i];
+        const digit = lastDigitOf(q);
+        prices.push(q);
+        ticks.push(digit);
+      }
+      
+      totalTicks = ticks.length;
+      tickCountEl.textContent = totalTicks;
+      
+      if (prices.length > 0) {
+        const last = prices[prices.length - 1];
+        priceEl.textContent = last.toFixed(pipSize);
+        paintPrice(last, prices.length > 1 ? prices[prices.length - 2] : null);
+        updateChange(last);
+        lastDigitEl.textContent = ticks[ticks.length - 1];
+        lastPrice = last;
+        
+        if (sessionHigh === null) sessionHigh = Math.max(...prices);
+        if (sessionLow === null) sessionLow = Math.min(...prices);
+        if (sessionHigh !== null && highEl.textContent === "—") highEl.textContent = sessionHigh.toFixed(pipSize);
+        if (sessionLow !== null && lowEl.textContent === "—") lowEl.textContent = sessionLow.toFixed(pipSize);
+      }
+      
+      historyLoaded = true;
+      analyze();
+      drawChart();
+      drawSpark();
+      return;
+    }
+
+    // Handle live ticks
+    if (data.msg_type === "tick" && data.tick) {
+      if (data.tick.symbol !== marketEl.value) return;
+
+      if (data.tick.pip_size) pipSize = data.tick.pip_size;
+      const quote = Number(data.tick.quote);
+      const digit = lastDigitOf(quote);
+
+      totalTicks++;
+      tickCountEl.textContent = totalTicks;
+
+      priceEl.textContent = quote.toFixed(pipSize);
+      lastDigitEl.textContent = digit;
+      paintPrice(quote, lastPrice);
+      updateChange(quote);
+      lastPrice = quote;
+
+      if (sessionHigh === null || quote > sessionHigh) {
+        sessionHigh = quote;
+        highEl.textContent = sessionHigh.toFixed(pipSize);
+      }
+      if (sessionLow === null || quote < sessionLow) {
+        sessionLow = quote;
+        lowEl.textContent = sessionLow.toFixed(pipSize);
+      }
+
+      ticks.push(digit);
+      prices.push(quote);
+
+      const max = getSampleSize();
+      if (ticks.length > max) ticks.shift();
+      if (prices.length > max) prices.shift();
+
+      pushChartPoint(data.tick.epoch, quote);
+      pushSamplePoint(data.tick.epoch, quote);
+      analyze();
+    }
+  };
+
+  ws.onclose = () => {
+    setStatus("Reconnecting...", false);
+    stopPing();
+    reconnectTimer = setTimeout(connect, 2000);
+  };
+
+  ws.onerror = () => {
+    setStatus("Connection Error", false);
+  };
+}
+
+function loadHistoryAndSubscribe(symbol) {
+  ticks = [];
+  prices = [];
+  totalTicks = 0;
+  sessionHigh = null;
+  sessionLow = null;
+  dayOpen = null;
+  lastPrice = null;
+  historyLoaded = false;
+  chartPoints = [];
+  samplePoints = [];
+  hoverIndex = -1;
+  viewBars = null;
+  viewRight = null;
+  followLive = true;
+  document.getElementById("chartTitle").textContent = marketEl.options[marketEl.selectedIndex].text;
+  drawChart();
+  tickCountEl.textContent = "0";
+  highEl.textContent = "—";
+  lowEl.textContent = "—";
+  priceEl.textContent = "—";
+  lastDigitEl.textContent = "—";
+  changeEl.textContent = "—";
+
+  if (syncTimer) clearInterval(syncTimer);
+  syncTimer = setInterval(syncSample, 2000);
+
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+  if (subscriptionId) {
+    ws.send(JSON.stringify({ forget: subscriptionId }));
+  }
+
+  // Request historical ticks for analysis + a larger sample for 24H high/low
+  const n = getSampleSize();
+
+  // Today's chart candle only: opens 00:00 UTC. count:1 returns a different candle.
+  const nowSec = Math.floor(Date.now() / 1000);
+  const midnight = nowSec - (nowSec % 86400);
+  ws.send(JSON.stringify({
+    ticks_history: symbol,
+    start: midnight,
+    end: "latest",
+    style: "candles",
+    granularity: 86400,
+    req_id: 1
+  }));
+
+  // Second request: exact sample size for digit analysis
+  setTimeout(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        ticks_history: symbol,
+        count: STORE_LIMIT,
+        end: "latest",
+        style: "ticks",
+        req_id: 2
+      }));
+    }
+  }, 200);
+
+  // Then subscribe to live ticks
+  setTimeout(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        ticks: symbol,
+        subscribe: 1
+      }));
+      loadChartCandles();
+    }
+  }, 300);
+}
+
+function fmtGmt(epoch, withDate) {
+  if (!epoch) return "";
+  const d = new Date(epoch * 1000);
+  const p = (n) => String(n).padStart(2, "0");
+  const time = p(d.getUTCHours()) + ":" + p(d.getUTCMinutes()) + ":" + p(d.getUTCSeconds());
+  if (!withDate) return time;
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return d.getUTCDate() + " " + months[d.getUTCMonth()] + " " + d.getUTCFullYear() + " " + time;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function pushSamplePoint(epoch, quote) {
+  if (samplePoints.length && samplePoints[samplePoints.length - 1].t === epoch) {
+    samplePoints[samplePoints.length - 1].q = quote;
+    return;
+  }
+  samplePoints.push({ t: epoch, q: quote });
+  const cap = getSampleSize() >= 1000 ? 1000 : getSampleSize() + 1;
+  if (samplePoints.length > cap) samplePoints.shift();
+}
+
+function syncSample() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  const want = getSampleSize();
+  ws.send(JSON.stringify({
+    ticks_history: marketEl.value,
+    end: "latest",
+    count: want >= 1000 ? 1000 : want + 1,
+    style: "ticks",
+    req_id: 4
+  }));
+}
+
+function pushChartPoint(epoch, quote) {
+  if (chartPoints.length && chartPoints[chartPoints.length - 1].t === epoch) {
+    chartPoints[chartPoints.length - 1].q = quote;
+  } else {
+    chartPoints.push({ t: epoch, q: quote });
+    if (chartPoints.length > STORE_LIMIT) chartPoints.shift();
+  }
+  applyTickToCandle(epoch, quote);
+  drawChart();
+  drawSpark();
+}
+
+function drawSpark() {
+  const canvas = document.getElementById("spark");
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = 96, h = 38;
+  canvas.width = Math.floor(w * dpr);
+  canvas.height = Math.floor(h * dpr);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  const pts = chartPoints.slice(-36);
+  if (pts.length < 2) return;
+  let min = Infinity, max = -Infinity;
+  for (const p of pts) {
+    if (p.q < min) min = p.q;
+    if (p.q > max) max = p.q;
+  }
+  const span = max - min || 1;
+  min -= span * 0.15;
+  max += span * 0.15;
+  const last = pts[pts.length - 1].q;
+  let hi = 0, lo = 0;
+  for (let i = 1; i < pts.length; i++) {
+    if (pts[i].q >= pts[hi].q) hi = i;
+    if (pts[i].q <= pts[lo].q) lo = i;
+  }
+  const xOf = (i) => 4 + (i / (pts.length - 1)) * (w - 12);
+  const yOf = (q) => 5 + (1 - (q - min) / (max - min)) * (h - 10);
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), yOf(pts[0].q));
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(xOf(i), yOf(pts[i].q));
+  ctx.strokeStyle = "#c5d0e0";
+  ctx.lineWidth = 1.6;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.stroke();
+  function dot(i, color) {
+    ctx.beginPath();
+    ctx.arc(xOf(i), yOf(pts[i].q), 2.7, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+  if (lo !== pts.length - 1) dot(lo, "#ff5c6c");
+  if (hi !== pts.length - 1) dot(hi, "#5b8def");
+  dot(pts.length - 1, "#2ee59d");
+}
+
+function applyTickToCandle(epoch, quote) {
+  if (chartTfEl.value === "ticks" || !chartCandles.length) return;
+  const g = Number(chartTfEl.value);
+  const bucket = epoch - (epoch % g);
+  const last = chartCandles[chartCandles.length - 1];
+  if (Number(last.epoch) === bucket) {
+    last.close = quote;
+    last.high = Math.max(Number(last.high), quote);
+    last.low = Math.min(Number(last.low), quote);
+  } else if (bucket > Number(last.epoch)) {
+    chartCandles.push({ epoch: bucket, open: quote, high: quote, low: quote, close: quote });
+    if (chartCandles.length > 300) chartCandles.shift();
+  }
+}
+
+function loadChartCandles() {
+  if (chartTfEl.value === "ticks") {
+    drawChart();
+    return;
+  }
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  const g = Number(chartTfEl.value);
+  const count = g >= 86400 ? 120 : 160;
+  ws.send(JSON.stringify({
+    ticks_history: marketEl.value,
+    end: "latest",
+    count: count,
+    style: "candles",
+    granularity: g,
+    req_id: 3
+  }));
+}
+
+function chartSeries() {
+  if (chartTfEl.value === "ticks") {
+    return chartPoints.map(p => ({ t: p.t, q: p.q }));
+  }
+  return chartCandles.map(c => ({
+    t: Number(c.epoch),
+    q: Number(c.close),
+    o: Number(c.open),
+    h: Number(c.high),
+    l: Number(c.low),
+    c: Number(c.close)
+  }));
+}
+
+function computeView(total) {
+  if (total < 2) return { start: 0, end: total, bars: total };
+  let bars = viewBars == null ? total : Math.max(12, Math.min(total, Math.round(viewBars)));
+  let end = followLive || viewRight == null ? total : viewRight;
+  end = Math.max(bars, Math.min(total, end));
+  const start = end - bars;
+  return { start, end, bars };
+}
+
+function zoomChart(factor) {
+  const total = chartSeries().length;
+  if (total < 3) return;
+  const view = computeView(total);
+  let next = Math.round(view.bars * factor);
+  next = Math.max(12, Math.min(total, next));
+  const end = view.end;
+  viewBars = next >= total ? null : next;
+  if (end >= total) {
+    followLive = true;
+    viewRight = null;
+  } else {
+    followLive = false;
+    viewRight = Math.max(next, Math.min(total, end));
+  }
+  drawChart();
+}
+
+function fmtAxis(epoch) {
+  const g = chartTfEl.value === "ticks" ? 1 : Number(chartTfEl.value);
+  if (!epoch) return "";
+  if (g >= 86400) {
+    const d = new Date(epoch * 1000);
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return d.getUTCDate() + " " + months[d.getUTCMonth()];
+  }
+  const clock = fmtGmt(epoch, false);
+  return g >= 3600 ? clock.slice(0, 5) : clock;
+}
+
+function drawChart() {
+  const canvas = chartCanvas;
+  const dpr = window.devicePixelRatio || 1;
+  const w = chartWrap.clientWidth;
+  const h = chartWrap.clientHeight;
+  if (!w || !h) return;
+  canvas.width = Math.floor(w * dpr);
+  canvas.height = Math.floor(h * dpr);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  const pad = { l: 12, r: 84, t: 16, b: 26 };
+  const plotW = w - pad.l - pad.r;
+  const plotH = h - pad.t - pad.b;
+  const all = chartSeries();
+  const view = computeView(all.length);
+  const pts = all.slice(view.start, view.end);
+  const candleMode = chartTfEl.value !== "ticks" && chartStyleEl.value === "candles";
+  if (pts.length < 2) {
+    ctx.fillStyle = "#7a8ba3";
+    ctx.font = "12px system-ui, sans-serif";
+    ctx.fillText("Waiting for ticks...", pad.l, pad.t + 20);
+    return;
+  }
+
+  let min = Infinity, max = -Infinity;
+  for (const p of pts) {
+    const hi = p.h != null ? p.h : p.q;
+    const lo = p.l != null ? p.l : p.q;
+    if (lo < min) min = lo;
+    if (hi > max) max = hi;
+  }
+  const span = max - min || 1;
+  min -= span * 0.08;
+  max += span * 0.08;
+
+  const xOf = candleMode
+    ? (i) => pad.l + (i + 0.5) * (plotW / pts.length)
+    : (i) => pad.l + (i / (pts.length - 1)) * plotW;
+  const yOf = (q) => pad.t + (1 - (q - min) / (max - min)) * plotH;
+
+  ctx.strokeStyle = "#1e2a3d";
+  ctx.lineWidth = 1;
+  ctx.font = "11px system-ui, sans-serif";
+  ctx.fillStyle = "#6b7c93";
+  ctx.textAlign = "left";
+  for (let g = 0; g <= 4; g++) {
+    const y = pad.t + (g / 4) * plotH;
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(pad.l + plotW, y);
+    ctx.stroke();
+    const price = max - (g / 4) * (max - min);
+    ctx.fillText(price.toFixed(pipSize), pad.l + plotW + 8, y + 4);
+  }
+
+  if (!candleMode) {
+  const lastQ = pts[pts.length - 1].q;
+  const rising = dayOpen != null ? lastQ >= dayOpen : lastQ >= pts[0].q;
+  const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + plotH);
+  grad.addColorStop(0, rising ? "rgba(46,229,157,0.32)" : "rgba(255,92,108,0.32)");
+  grad.addColorStop(1, rising ? "rgba(46,229,157,0)" : "rgba(255,92,108,0)");
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), yOf(pts[0].q));
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(xOf(i), yOf(pts[i].q));
+  ctx.lineTo(xOf(pts.length - 1), pad.t + plotH);
+  ctx.lineTo(xOf(0), pad.t + plotH);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.strokeStyle = "#f4f7fb";
+  ctx.lineWidth = 1.6;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.moveTo(xOf(0), yOf(pts[0].q));
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(xOf(i), yOf(pts[i].q));
+  ctx.stroke();
+  } else {
+    const bodyW = Math.max(2, Math.min(16, (plotW / pts.length) * 0.62));
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      const up = p.c >= p.o;
+      const color = up ? "#2ee59d" : "#ff5c6c";
+      const x = xOf(i);
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(x, yOf(p.h));
+      ctx.lineTo(x, yOf(p.l));
+      ctx.stroke();
+      const y1 = yOf(Math.max(p.o, p.c));
+      const y2 = yOf(Math.min(p.o, p.c));
+      const bh = Math.max(1, y2 - y1);
+      ctx.fillRect(x - bodyW / 2, y1, bodyW, bh);
+    }
+  }
+
+  ctx.fillStyle = "#6b7c93";
+  ctx.textAlign = "center";
+  for (let m = 0; m < 5; m++) {
+    const i = Math.round((m / 4) * (pts.length - 1));
+    ctx.fillText(fmtAxis(pts[i].t), xOf(i), h - 8);
+  }
+
+  const last = pts[pts.length - 1];
+  const lx = xOf(pts.length - 1);
+  const ly = yOf(last.q);
+  ctx.beginPath();
+  ctx.arc(lx, ly, 3.5, 0, Math.PI * 2);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+
+  const label = last.q.toFixed(pipSize);
+  ctx.font = "12px system-ui, sans-serif";
+  const tw = ctx.measureText(label).width + 14;
+  const tx = Math.min(w - tw - 6, Math.max(pad.l, lx - tw / 2));
+  const ty = Math.max(6, Math.min(ly - 28, h - pad.b - 8));
+  ctx.fillStyle = "#f4f7fb";
+  roundRect(ctx, lx + 8, Math.max(pad.t, Math.min(ly - 11, pad.t + plotH - 22)), tw, 22, 4);
+  ctx.fill();
+  ctx.fillStyle = "#111318";
+  ctx.textAlign = "left";
+  ctx.fillText(label, lx + 15, Math.max(pad.t, Math.min(ly - 11, pad.t + plotH - 22)) + 15);
+
+  if (hoverIndex >= 0 && hoverIndex < pts.length) {
+    const hp = pts[hoverIndex];
+    const hx = xOf(hoverIndex);
+    const hy = yOf(hp.q);
+    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = "#8ea0b8";
+    ctx.beginPath();
+    ctx.moveTo(hx, pad.t);
+    ctx.lineTo(hx, pad.t + plotH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(hx, hy, 4, 0, Math.PI * 2);
+    ctx.fillStyle = "#2ee59d";
+    ctx.fill();
+  }
+}
+
+chartCanvas.addEventListener("mousemove", (ev) => {
+  const all = chartSeries();
+  const view = computeView(all.length);
+  const series = all.slice(view.start, view.end);
+  if (series.length < 2) return;
+  const rect = chartCanvas.getBoundingClientRect();
+  if (chartDrag) {
+    const plotW = rect.width - 12 - 84;
+    const shift = Math.round((ev.clientX - chartDragX) / plotW * view.bars);
+    if (shift !== 0) {
+      let end = view.end - shift;
+      end = Math.max(view.bars, Math.min(all.length, end));
+      viewRight = end;
+      viewBars = view.bars >= all.length ? null : view.bars;
+      followLive = end >= all.length;
+      if (followLive) viewRight = null;
+      chartDragX = ev.clientX;
+      chartTip.style.display = "none";
+      drawChart();
+    }
+    return;
+  }
+  const x = ev.clientX - rect.left;
+  const padL = 12, padR = 84;
+  const plotW = rect.width - padL - padR;
+  const candleMode = chartTfEl.value !== "ticks" && chartStyleEl.value === "candles";
+  let i;
+  if (candleMode) {
+    i = Math.floor(((x - padL) / plotW) * series.length);
+  } else {
+    i = Math.round(((x - padL) / plotW) * (series.length - 1));
+  }
+  i = Math.max(0, Math.min(series.length - 1, i));
+  hoverIndex = i;
+  const p = series[i];
+  const prev = series[Math.max(0, i - 1)];
+  const base = p.o != null ? p.o : (prev ? prev.q : p.q);
+  const px = p.q;
+  const pct = base ? ((px - base) / base) * 100 : 0;
+  const up = pct >= 0;
+  let body;
+  if (p.o != null && chartStyleEl.value === "candles" && chartTfEl.value !== "ticks") {
+    body = "O " + p.o.toFixed(pipSize) + "  H " + p.h.toFixed(pipSize) + "<br>L " + p.l.toFixed(pipSize) + "  C " + p.c.toFixed(pipSize);
+  } else {
+    body = p.q.toFixed(pipSize);
+  }
+  chartTip.style.display = "block";
+  chartTip.innerHTML =
+    '<div class="tip-pct ' + (up ? "up" : "down") + '">' + (up ? "+" : "") + pct.toFixed(2) + "%</div>" +
+    '<div class="tip-px">' + body + "</div>" +
+    '<div class="tip-tm">' + fmtGmt(p.t, true) + " GMT</div>";
+  let left = x + 14;
+  if (left + 190 > rect.width) left = x - 190;
+  chartTip.style.left = left + "px";
+  chartTip.style.top = Math.max(8, ev.clientY - rect.top - 70) + "px";
+  drawChart();
+});
+chartCanvas.addEventListener("mouseleave", () => {
+  if (chartDrag) return;
+  hoverIndex = -1;
+  chartTip.style.display = "none";
+  drawChart();
+});
+chartCanvas.addEventListener("wheel", (ev) => {
+  ev.preventDefault();
+  const all = chartSeries();
+  if (all.length < 3) return;
+  const view = computeView(all.length);
+  const rect = chartCanvas.getBoundingClientRect();
+  const plotW = rect.width - 96;
+  const rel = Math.max(0, Math.min(1, (ev.clientX - rect.left - 12) / plotW));
+  const factor = ev.deltaY > 0 ? 1.25 : 0.8;
+  let next = Math.round(view.bars * factor);
+  next = Math.max(12, Math.min(all.length, next));
+  const anchor = view.start + rel * view.bars;
+  let end = Math.round(anchor + (1 - rel) * next);
+  end = Math.max(next, Math.min(all.length, end));
+  viewBars = next >= all.length ? null : next;
+  followLive = end >= all.length;
+  viewRight = followLive ? null : end;
+  drawChart();
+}, { passive: false });
+chartCanvas.addEventListener("mousedown", (ev) => {
+  chartDrag = true;
+  chartDragX = ev.clientX;
+  chartCanvas.style.cursor = "grabbing";
+});
+window.addEventListener("mouseup", () => {
+  chartDrag = false;
+  chartCanvas.style.cursor = "crosshair";
+});
+chartCanvas.addEventListener("dblclick", () => {
+  viewBars = null;
+  viewRight = null;
+  followLive = true;
+  drawChart();
+});
+document.getElementById("zoomIn").addEventListener("click", () => zoomChart(0.7));
+document.getElementById("zoomOut").addEventListener("click", () => zoomChart(1.4));
+document.getElementById("zoomReset").addEventListener("click", () => {
+  viewBars = null;
+  viewRight = null;
+  followLive = true;
+  drawChart();
+});
+window.addEventListener("resize", drawChart);
+
+function updateChange(quote) {
+  const base = dayOpen != null ? dayOpen : (prices.length > 1 ? prices[0] : null);
+  if (base == null || !base) return;
+  const pct = ((quote - base) / base) * 100;
+  const isUp = pct >= 0;
+  changeEl.className = "change " + (isUp ? "up" : "down");
+  changeEl.textContent = (isUp ? "▲ +" : "▼ ") + Math.abs(pct).toFixed(2) + "%";
+}
+
+function paintPrice(quote, prev) {
+  if (prev != null && quote !== prev) {
+    const dir = quote > prev ? "up" : "down";
+    priceEl.className = "price " + dir;
+    lastDigitEl.className = "last-digit " + dir;
+  }
+}
+
+function analyze() {
+  const want = getSampleSize();
+  const src = samplePoints.length ? samplePoints : chartPoints;
+  if (src.length) {
+    const start = Math.max(0, src.length - want);
+    const samplePts = src.slice(start);
+    prices = samplePts.map(p => p.q);
+    ticks = prices.map(lastDigitOf);
+  }
+  const n = Math.min(ticks.length, want);
+  if (n === 0) return;
+
+  const sampleDigits = ticks.slice(-n);
+  const samplePrices = prices.slice(-n);
+
+  // Even / Odd
+  let even = 0, odd = 0;
+  sampleDigits.forEach(d => d % 2 === 0 ? even++ : odd++);
+  const evenPct = ((even / n) * 100).toFixed(1);
+  const oddPct = ((odd / n) * 100).toFixed(1);
+  document.getElementById("evenBar").style.width = evenPct + "%";
+  document.getElementById("oddBar").style.width = oddPct + "%";
+  document.getElementById("evenPct").textContent = evenPct + "% (" + even + ")";
+  document.getElementById("oddPct").textContent = oddPct + "% (" + odd + ")";
+  document.getElementById("eoBadge").textContent = n + " ticks";
+
+  // Over / Under
+  const overVal = readDigit(overEl, 4);
+  const underVal = readDigit(underEl, 5);
+  document.getElementById("overLabel").textContent = "Over " + overVal;
+  document.getElementById("underLabel").textContent = "Under " + underVal;
+
+  let over = 0, under = 0;
+  sampleDigits.forEach(d => {
+    if (d > overVal) over++;
+    if (d < underVal) under++;
+  });
+  const overPct = ((over / n) * 100).toFixed(1);
+  const underPct = ((under / n) * 100).toFixed(1);
+  document.getElementById("overBar").style.width = overPct + "%";
+  document.getElementById("underBar").style.width = underPct + "%";
+  document.getElementById("overPct").textContent = overPct + "% (" + over + ")";
+  document.getElementById("underPct").textContent = underPct + "% (" + under + ")";
+  document.getElementById("ouBadge").textContent = n + " ticks";
+
+  // Each of the N ticks is rise or fall against the tick before it,
+  // including the tick just outside the window, so the count matches the others.
+  let rise = 0, fall = 0;
+  const riseSrc = samplePoints.length ? samplePoints : chartPoints;
+  const start = Math.max(0, riseSrc.length - n);
+  for (let i = 0; i < n; i++) {
+    const prev = start + i - 1;
+    if (prev < 0) continue;
+    const q = riseSrc[start + i].q;
+    const before = riseSrc[prev].q;
+    if (q > before) rise++;
+    else fall++;
+  }
+  const compared = rise + fall || n;
+  const risePct = ((rise / compared) * 100).toFixed(1);
+  const fallPct = ((fall / compared) * 100).toFixed(1);
+  document.getElementById("riseBar").style.width = risePct + "%";
+  document.getElementById("fallBar").style.width = fallPct + "%";
+  document.getElementById("risePct").textContent = risePct + "% (" + rise + ")";
+  document.getElementById("fallPct").textContent = fallPct + "% (" + fall + ")";
+  document.getElementById("rfBadge").textContent = compared + " ticks";
+
+  // Digit Frequency
+  const freq = Array(10).fill(0);
+  sampleDigits.forEach(d => freq[d]++);
+
+  const lastAt = Array(10).fill(-1);
+  sampleDigits.forEach((d, i) => { lastAt[d] = i; });
+
+  let most = 0;
+  let least = 0;
+  for (let d = 1; d <= 9; d++) {
+    if (freq[d] > freq[most] || (freq[d] === freq[most] && lastAt[d] > lastAt[most])) most = d;
+    if (freq[d] < freq[least] || (freq[d] === freq[least] && lastAt[d] < lastAt[least])) least = d;
+  }
+
+  const peak = Math.max(...freq, 1);
+  freq.forEach((f, d) => {
+    const pct = ((f / n) * 100).toFixed(1);
+    document.getElementById(`pct-${d}`).textContent = pct + "%";
+    const bar = document.getElementById(`bar-${d}`);
+    bar.style.height = Math.max(2, (f / peak) * 58) + "px";
+    document.getElementById(`cell-${d}`).className = "digit-cell";
+  });
+
+  document.getElementById(`cell-${most}`).classList.add("most");
+  document.getElementById(`cell-${least}`).classList.add("least");
+
+  document.getElementById("most").textContent = String(most);
+  document.getElementById("least").textContent = String(least);
+  document.getElementById("mdBadge").textContent = n + " ticks";
+  document.getElementById("digitBadge").textContent = n + " ticks";
+  const marketName = marketEl.options[marketEl.selectedIndex].text;
+  document.getElementById("digitNote").textContent = "Last digit stats for the latest " + n + " ticks on " + marketName;
+}
+
+marketEl.addEventListener("change", () => loadHistoryAndSubscribe(marketEl.value));
+chartTfEl.addEventListener("change", () => {
+  if (chartTfEl.value === "ticks") chartStyleEl.value = "line";
+  hoverIndex = -1;
+  viewBars = null;
+  viewRight = null;
+  followLive = true;
+  loadChartCandles();
+});
+chartStyleEl.addEventListener("change", () => {
+  if (chartStyleEl.value === "candles" && chartTfEl.value === "ticks") chartTfEl.value = "60";
+  hoverIndex = -1;
+  viewBars = null;
+  viewRight = null;
+  followLive = true;
+  loadChartCandles();
+});
+ticksEl.addEventListener("change", applyTickInput);
+document.getElementById("rangeOk").addEventListener("click", () => {
+  document.getElementById("rangePop").classList.remove("show");
+});
+overEl.addEventListener("input", () => applyDigitInput(overEl, 4));
+underEl.addEventListener("input", () => applyDigitInput(underEl, 5));
+overEl.addEventListener("change", () => {
+  if (overEl.value.trim() === "") {
+    overEl.value = "4";
+    showPopup("Digit limit", "Numbers should be between 0-9");
+    analyze();
+  }
+});
+underEl.addEventListener("change", () => {
+  if (underEl.value.trim() === "") {
+    underEl.value = "5";
+    showPopup("Digit limit", "Numbers should be between 0-9");
+    analyze();
+  }
+});
+
+
+// Custom market picker (dark theme)
+(function(){
+  const pick = document.getElementById("marketPick");
+  const trigger = document.getElementById("mpTrigger");
+  const menu = document.getElementById("mpMenu");
+  const label = document.getElementById("mpLabel");
+  const market = document.getElementById("market");
+  if (!pick || !trigger || !menu || !market) return;
+
+  function close() {
+    menu.hidden = true;
+    pick.classList.remove("open");
+    trigger.setAttribute("aria-expanded", "false");
+  }
+  function open() {
+    menu.hidden = false;
+    pick.classList.add("open");
+    trigger.setAttribute("aria-expanded", "true");
+    const active = menu.querySelector(".mp-item.active");
+    if (active) active.scrollIntoView({ block: "nearest" });
+  }
+  trigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (menu.hidden) open(); else close();
+  });
+  menu.addEventListener("click", (e) => {
+    const btn = e.target.closest(".mp-item");
+    if (!btn) return;
+    const value = btn.getAttribute("data-value");
+    market.value = value;
+    label.textContent = btn.textContent.trim();
+    menu.querySelectorAll(".mp-item").forEach(el => el.classList.toggle("active", el === btn));
+    close();
+    market.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  document.addEventListener("click", (e) => {
+    if (!pick.contains(e.target)) close();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") close();
+  });
+})();
+
+
+connect();
+
+</script>
+</body>
+</html>
